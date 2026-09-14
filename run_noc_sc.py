@@ -209,6 +209,9 @@ def main():
     ap.add_argument("--manifest", type=Path, required=True)
     ap.add_argument("--data-root", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--min-area", type=int, default=100,
+                    help="skip instances with fewer than this many foreground "
+                         "pixels; 0 evaluates every instance in the manifest")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0)
     args = ap.parse_args()
@@ -236,7 +239,7 @@ def main():
         writer.writeheader()
 
     n_done = 0
-    for inst_id, img_path, gt, void in load_instances(args.data_root, args.manifest):
+    for inst_id, img_path, gt, void in load_instances(args.data_root, args.manifest, args.min_area):
         if args.limit and n_done >= args.limit:
             break
         n_done += 1

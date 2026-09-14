@@ -41,7 +41,7 @@ def load_binary_mask(path) -> np.ndarray:
     return arr > (127 if arr.max() >= 128 else 0)
 
 
-def load_instances(data_root: Path, manifest: Path):
+def load_instances(data_root: Path, manifest: Path, min_area: int = 100):
     """Read the manifest.csv written by prep_datasets.py: columns id, img, gt, void, with
     paths relative to data_root."""
     import csv
@@ -49,7 +49,7 @@ def load_instances(data_root: Path, manifest: Path):
         rows = list(csv.DictReader(f))
     for r in rows:
         gt = load_binary_mask(data_root / r["gt"])
-        if gt.sum() < 100:  # skip tiny instances (also filtered in prep_datasets.py)
+        if gt.sum() < min_area:  # 0 keeps every instance the manifest lists
             continue
         void = load_binary_mask(data_root / r["void"]) if r.get("void") else None
         yield r["id"], data_root / r["img"], gt, void
@@ -104,6 +104,9 @@ def main():
     ap.add_argument("--prompt-tag", default="click1")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0, help="run only the first N instances (smoke test)")
+    ap.add_argument("--min-area", type=int, default=100,
+                    help="skip instances with fewer than this many foreground "
+                         "pixels; 0 evaluates every instance in the manifest")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -114,7 +117,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     n_done, ious_vs_gt = 0, []
-    for inst_id, img_path, gt, void in load_instances(args.data_root, args.manifest):
+    for inst_id, img_path, gt, void in load_instances(args.data_root, args.manifest, args.min_area):
         if args.limit and n_done >= args.limit:
             break
         out_path = out_dir / f"{inst_id}.npz"
